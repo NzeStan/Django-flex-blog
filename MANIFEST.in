@@ -1,0 +1,6 @@
+include LICENSE
+include README.md
+recursive-include flex_blog/templates *
+recursive-include flex_blog/static *
+recursive-include flex_blog/locale *
+recursive-include docs *
