@@ -63,6 +63,7 @@ flex_blog = ["templates/**/*", "locale/**/*"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "tests.settings"
+pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
 filterwarnings = ["error::RuntimeWarning"]

@@ -224,7 +224,12 @@ def test_system_checks():
                                       "SEARCH": {"backend": "missing.Backend"}, "COMMENTS": {"moderation": "maybe"}}):
         ids = {e.id for e in check_settings(None)}
     assert {"flex_blog.W001", "flex_blog.W002", "flex_blog.E003", "flex_blog.E005", "flex_blog.E006"} <= ids
-    assert "flex_blog.W010" in {w.id for w in check_deploy(None)}
+    locmem = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+    with override_settings(CACHES=locmem):
+        assert "flex_blog.W010" in {w.id for w in check_deploy(None)}
+    redis = {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": "redis://localhost:6379"}}
+    with override_settings(CACHES=redis):
+        assert "flex_blog.W010" not in {w.id for w in check_deploy(None)}
     assert check_settings(None) == []
 
 
