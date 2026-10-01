@@ -1,0 +1,12 @@
+{% load i18n %}{% autoescape off %}{{ article.title }}
+{% if article.subtitle %}{{ article.subtitle }}
+{% endif %}{% if article.author %}{% blocktranslate with name=article.author.display_name %}by {{ name }}{% endblocktranslate %}
+{% endif %}
+{{ article.excerpt }}
+
+{% translate "Read it here:" %} {{ article_url }}
+
+--
+{% blocktranslate %}You receive this because you subscribed to {{ site_name }}.{% endblocktranslate %}
+{% translate "Unsubscribe:" %} {{ unsubscribe_url }}
+{% endautoescape %}

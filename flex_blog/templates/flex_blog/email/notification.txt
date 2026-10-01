@@ -1,0 +1,9 @@
+{% load i18n %}{% autoescape off %}{{ message.title }}
+{% if message.body %}
+{{ message.body }}
+{% endif %}{% if url %}
+{{ url }}
+{% endif %}
+--
+{{ site_name }}
+{% endautoescape %}

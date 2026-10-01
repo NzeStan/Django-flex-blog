@@ -1,12 +1,81 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.black]
-line-length = 88
-target-version = ['py38']
-include = '\.pyi?$'
+[project]
+name = "django-flex-blog"
+dynamic = ["version"]
+description = "A complete, secure, headless blog backend for Django REST Framework: articles, comments, reactions, newsletter, notifications, webhooks, feeds and more. Every feature optional."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "NzeStan" }]
+requires-python = ">=3.10"
+keywords = ["django", "blog", "cms", "headless", "rest", "api", "django-rest-framework", "newsletter", "comments"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.0",
+    "Framework :: Django :: 5.1",
+    "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content :: News/Diary",
+]
+dependencies = [
+    "Django>=4.2",
+    "djangorestframework>=3.14",
+    "django-filter>=23.1",
+    "Pillow>=10.0",
+    "markdown-it-py>=3.0",
+    "nh3>=0.2.14",
+]
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
+[project.optional-dependencies]
+celery = ["celery>=5.3"]
+postgres = ["psycopg[binary]>=3.1"]
+test = ["pytest>=8", "pytest-django>=4.8", "pytest-cov>=5"]
+
+[project.urls]
+Homepage = "https://github.com/NzeStan/Django-flex-blog"
+Documentation = "https://github.com/NzeStan/Django-flex-blog#readme"
+Issues = "https://github.com/NzeStan/Django-flex-blog/issues"
+Changelog = "https://github.com/NzeStan/Django-flex-blog/blob/main/CHANGELOG.md"
+
+[tool.setuptools.dynamic]
+version = { attr = "flex_blog.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["flex_blog*"]
+
+[tool.setuptools.package-data]
+flex_blog = ["templates/**/*", "locale/**/*"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.settings"
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+filterwarnings = ["error::RuntimeWarning"]
+
+[tool.coverage.run]
+source = ["flex_blog"]
+omit = ["flex_blog/migrations/*"]
+
+[tool.ruff]
+extend-exclude = ["flex_blog/migrations"]
+line-length = 160
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "DJ"]
+ignore = ["B904", "DJ001"]

@@ -1,0 +1,8 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello{% endblocktranslate %}{% if subscriber.name %} {{ subscriber.name }}{% endif %},
+
+{% blocktranslate %}Please confirm that you want to receive new articles from {{ site_name }}:{% endblocktranslate %}
+
+{{ confirm_url }}
+
+{% blocktranslate %}If you did not ask for this, ignore this email and nothing will happen.{% endblocktranslate %}
+{% endautoescape %}

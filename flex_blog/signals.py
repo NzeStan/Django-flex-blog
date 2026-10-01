@@ -1,84 +1,98 @@
-from django.db.models.signals import pre_save, post_save, pre_delete
-from django.dispatch import receiver
-from django.utils import timezone
+"""
+Domain events: the public plugin API of django-flex-blog.
+
+Every event is sent *after* the database transaction commits, exactly once
+per logical occurrence, and carries a unique ``event_id`` you can use as an
+idempotency key in your own receivers. Connect to them like any Django signal::
+
+    from django.dispatch import receiver
+    from flex_blog.signals import article_published
+
+    @receiver(article_published)
+    def tweet_it(sender, article, event_id, **kwargs):
+        ...
+
+Receivers run synchronously in the request (or task) that triggered the
+event. Hand slow work to ``flex_blog.tasks.enqueue`` or your own queue.
+
+Events and their keyword arguments (all also receive ``event_id``):
+
+========================  ==============================================
+article_published         article
+article_unpublished       article
+article_viewed            article, user (may be None)
+comment_posted            comment (any status, including pending)
+comment_approved          comment, moderator (None when auto-approved)
+comment_rejected          comment, moderator, status ("rejected"/"spam")
+reaction_added            reaction
+reaction_removed          article, user, kind
+bookmark_added            bookmark
+subscriber_confirmed      subscriber
+subscriber_unsubscribed   subscriber
+========================  ==============================================
+"""
+
 import logging
+import uuid
 
-logger = logging.getLogger(__name__)
+from django.db import transaction
+from django.dispatch import Signal
+
+logger = logging.getLogger("flex_blog")
+
+article_published = Signal()
+article_unpublished = Signal()
+article_viewed = Signal()
+comment_posted = Signal()
+comment_approved = Signal()
+comment_rejected = Signal()
+reaction_added = Signal()
+reaction_removed = Signal()
+bookmark_added = Signal()
+subscriber_confirmed = Signal()
+subscriber_unsubscribed = Signal()
+
+EVENTS = {
+    "article_published": article_published,
+    "article_unpublished": article_unpublished,
+    "article_viewed": article_viewed,
+    "comment_posted": comment_posted,
+    "comment_approved": comment_approved,
+    "comment_rejected": comment_rejected,
+    "reaction_added": reaction_added,
+    "reaction_removed": reaction_removed,
+    "bookmark_added": bookmark_added,
+    "subscriber_confirmed": subscriber_confirmed,
+    "subscriber_unsubscribed": subscriber_unsubscribed,
+}
+
+# Events not forwarded to webhooks (too chatty to POST on every occurrence).
+WEBHOOK_EXCLUDED = {"article_viewed"}
 
 
-@receiver(pre_save)
-def set_slug_on_save(sender, instance, **kwargs):
+def emit(event, sender, **payload):
     """
-    Set a slug before saving if the model has a slug field and it's not set.
+    Send ``event`` once the current transaction commits (immediately when
+    there is none). A failing receiver is logged and never breaks the
+    request or the other receivers.
     """
-    from flex_blog.registry import model_registry
-    
-    # Skip if this isn't one of our registered models
-    if sender not in model_registry.get_all_models().values():
-        return
-        
-    # Check if it has a slug field
-    if hasattr(instance, 'slug') and not instance.slug:
-        from flex_blog.utils import generate_unique_slug
-        # Generate from title or name
-        if hasattr(instance, 'title'):
-            instance.slug = generate_unique_slug(instance, instance.title)
-        elif hasattr(instance, 'name'):
-            instance.slug = generate_unique_slug(instance, instance.name)
+    signal = EVENTS[event]
+    event_id = payload.pop("event_id", None) or uuid.uuid4()
 
+    def send():
+        for receiver, result in signal.send_robust(sender=sender, event_id=event_id, **payload):
+            if isinstance(result, Exception):
+                logger.error("flex_blog: receiver %r failed for %s", receiver, event, exc_info=result)
+        if event not in WEBHOOK_EXCLUDED:
+            from flex_blog.conf import blog_settings
 
-@receiver(pre_save)
-def set_published_date(sender, instance, **kwargs):
-    """
-    Set published_at when an article is published.
-    """
-    from flex_blog.registry import model_registry
-    
-    # Skip if this isn't our Article model
-    if sender != model_registry.get_model('article'):
-        return
-        
-    # If this is a new publish action
-    if hasattr(instance, 'status') and instance.status == 'published':
-        # Get the original instance if it exists
-        if instance.pk:
-            try:
-                original = sender.objects.get(pk=instance.pk)
-                if original.status != 'published' and not instance.published_at:
-                    instance.published_at = timezone.now()
-            except sender.DoesNotExist:
-                pass
-        # If it's a new instance
-        elif not instance.published_at:
-            instance.published_at = timezone.now()
+            if blog_settings.feature_enabled("webhooks"):
+                from flex_blog import webhooks
 
+                try:
+                    webhooks.dispatch(event, event_id, payload)
+                except Exception:
+                    logger.exception("flex_blog: could not queue webhooks for %s", event)
 
-@receiver(post_save)
-def log_model_changes(sender, instance, created, **kwargs):
-    """
-    Log model changes.
-    """
-    from flex_blog.registry import model_registry
-    
-    # Skip if this isn't one of our registered models
-    if sender not in model_registry.get_all_models().values():
-        return
-        
-    if created:
-        logger.info(f"Created {sender.__name__} with ID {instance.pk}")
-    else:
-        logger.info(f"Updated {sender.__name__} with ID {instance.pk}")
-
-
-@receiver(pre_delete)
-def log_model_deletion(sender, instance, **kwargs):
-    """
-    Log model deletion.
-    """
-    from flex_blog.registry import model_registry
-    
-    # Skip if this isn't one of our registered models
-    if sender not in model_registry.get_all_models().values():
-        return
-        
-    logger.info(f"Deleting {sender.__name__} with ID {instance.pk}")
+    transaction.on_commit(send)
+    return event_id

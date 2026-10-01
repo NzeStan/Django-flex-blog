@@ -1,6 +1,5 @@
-include LICENSE
-include README.md
+include LICENSE README.md CHANGELOG.md SECURITY.md
 recursive-include flex_blog/templates *
-recursive-include flex_blog/static *
 recursive-include flex_blog/locale *
-recursive-include docs *
+prune tests
+global-exclude *.py[cod] __pycache__
